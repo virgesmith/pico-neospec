@@ -25,7 +25,7 @@ NeoPixel::NeoPixel(int pin, int num_pixels) : pin(pin), num_pixels(num_pixels), 
 }
 
 int NeoPixel::setpixel(uint32_t pixel_grb) {
-  pio_sm_put_blocking(pio, sm, pixel_grb); // << 8u);
+  pio_sm_put_blocking(pio, sm, pixel_grb);
   _idx = (++_idx) % num_pixels;
   return _idx;
 }

@@ -15,9 +15,11 @@ union RGBW {
   int32_t u32;
 };
 
+const auto BLACK = RGBW(0, 0, 0);
 const auto RED = RGBW(255, 0, 0);
 const auto GREEN = RGBW(0, 255, 0);
 const auto BLUE = RGBW(0, 0, 255);
+const auto WHITE = RGBW(255, 255, 255);
 
 template<size_t N>
 void set_palette_red_to_green(std::array<RGBW, N>& palette) {

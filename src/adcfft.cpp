@@ -1,8 +1,22 @@
 #include "adcfft.h"
 #include "pico/stdlib.h"
 
-ADCFFT::ADCFFT(uint8_t adcpin, uint clock_div, uint SAMPLE_FREQ) : adcpin(adcpin), clock_div(clock_div), SAMPLE_FREQ(SAMPLE_FREQ) {
-  fft_cfg = kiss_fftr_alloc(SAMPLE_SIZE, false, 0, 0);
+#include <algorithm>
+#include <numeric>
+
+namespace {
+
+uint get_clock_div(uint sample_freq) {
+  // max sample rate @ 48kHz clock is 500kHz
+  return (sample_freq >= 500'000) ? 0 : (48'000'000 / sample_freq);
+}
+
+} // namespace
+
+ADCFFT::ADCFFT(uint8_t adcpin_, uint sample_freq_, uint sample_size_)
+    : adcpin(adcpin_), sample_freq(sample_freq_), clock_div(get_clock_div(sample_freq_)), sample_size(sample_size_),
+      freqs(sample_size), capture_buffer(sample_size), signal(sample_size), fft(sample_size) {
+  fft_cfg = kiss_fftr_alloc(sample_size, false, 0, 0);
 
   adc_gpio_init(26 + adcpin);
 
@@ -32,41 +46,34 @@ ADCFFT::ADCFFT(uint8_t adcpin, uint clock_div, uint SAMPLE_FREQ) : adcpin(adcpin
   channel_config_set_dreq(&dma_cfg, DREQ_ADC);
 
   // calculate frequencies of each bin
-  float f_res = SAMPLE_FREQ / SAMPLE_SIZE;
-  for (int i = 0; i < SAMPLE_SIZE; i++) {
+  float f_res = sample_freq / sample_size;
+  for (int i = 0; i < sample_size; i++) {
     freqs[i] = f_res * i;
   }
 }
 
 ADCFFT::~ADCFFT() { kiss_fft_free(fft_cfg); }
 
-const kiss_fft_cpx* ADCFFT::sample_raw() {
+const std::vector<kiss_fft_cpx>& ADCFFT::sample_raw() {
   adc_fifo_drain();
   adc_run(false);
 
   dma_channel_configure(dma_chan, &dma_cfg,
-                        cap_buf,       // dst
-                        &adc_hw->fifo, // src
-                        SAMPLE_SIZE,         // transfer count
-                        true           // start immediately
+                        capture_buffer.data(), // dst
+                        &adc_hw->fifo,         // src
+                        sample_size,           // transfer count
+                        true                   // start immediately
   );
 
   adc_run(true);
   dma_channel_wait_for_finish_blocking(dma_chan);
 
   // fill fourier transform input while subtracting DC component
-  uint64_t sum = 0;
-  for (int i = 0; i < ADCFFT::SAMPLE_SIZE; i++) {
-    sum += cap_buf[i];
-  }
-  float avg = (float)sum / ADCFFT::SAMPLE_SIZE;
-  for (int i = 0; i < ADCFFT::SAMPLE_SIZE; i++) {
-    fft_in[i] = (float)cap_buf[i] - avg;
-  }
+  float avg = float(std::accumulate(capture_buffer.begin(), capture_buffer.end(), 0)) / capture_buffer.size();
+  std::transform(capture_buffer.begin(), capture_buffer.end(), signal.begin(),
+                 [avg](uint8_t n) { return float(n) - avg; });
 
   // compute fast fourier transform
-  kiss_fftr(fft_cfg, fft_in, fft_out);
-  return fft_out;
+  kiss_fftr(fft_cfg, signal.data(), fft.data());
+  return fft;
 }
-
-

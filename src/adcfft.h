@@ -4,23 +4,22 @@
 #include "hardware/dma.h"
 
 #include <cstdint>
+#include <vector>
 
 class ADCFFT {
 public:
-  // BE CAREFUL: anything over about 9000 here will cause things
-  // to silently break. The code will compile and upload, but due
-  // to memory issues nothing will work properly
-  constexpr static uint SAMPLE_SIZE = 960;
-
-  ADCFFT(uint8_t adcpin, uint clock_div, uint SAMPLE_FREQ);
+  // sample size should not exceed 9000 (RP2040 memory constraints)
+  ADCFFT(uint8_t adcpin, uint sample_freq, uint sample_size);
 
   ~ADCFFT();
 
-  const kiss_fft_cpx* sample_raw();
-  const float* frequency_bins() { return freqs; };
+  const std::vector<kiss_fft_cpx>& sample_raw();
+  const std::vector<float>& frequency_bins() const { return freqs; };
 
+  const uint sample_size;
   const uint clock_div;
-  const uint SAMPLE_FREQ;
+
+  const uint sample_freq;
 
   // Channel 0 is GPIO26
   const uint8_t adcpin;
@@ -28,10 +27,10 @@ public:
 private:
   dma_channel_config dma_cfg;
   uint dma_chan;
-  float freqs[SAMPLE_SIZE];
+  std::vector<float> freqs;
 
-  uint8_t cap_buf[SAMPLE_SIZE];
-  kiss_fft_scalar fft_in[SAMPLE_SIZE]; // kiss_fft_scalar is a float
-  kiss_fft_cpx fft_out[SAMPLE_SIZE];
+  std::vector<uint8_t> capture_buffer;
+  std::vector<kiss_fft_scalar> signal; // kiss_fft_scalar is a float
+  std::vector<kiss_fft_cpx> fft;
   kiss_fftr_cfg fft_cfg;
 };
