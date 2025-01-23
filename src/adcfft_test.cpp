@@ -27,7 +27,7 @@ int main() {
   auto freqs = adcfft.frequency_bins();
 
   auto t = time_us_64();
-  auto delay_us = 1000000;
+  auto delay_us = 1000000ull;
 
   for (;;) {
     gpio_put(LED_PIN, 1);
@@ -48,7 +48,7 @@ int main() {
     }
 
     auto tnew = time_us_64();
-    printf("fpeak=%.1fHz dt=%ldus\n", freqs[max_idx], tnew - t - delay_us);
+    printf("fpeak=%.1fHz dt=%lldus\n", freqs[max_idx], tnew - t - delay_us);
     t = tnew;
     sleep_us(delay_us);
   }

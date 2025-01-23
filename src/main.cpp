@@ -16,12 +16,13 @@ constexpr uint SAMPLE_FREQ = 50'000;
 constexpr uint SAMPLE_SIZE = 960;
 constexpr uint8_t CAPTURE_CHANNEL = 1;
 
-// TODO align with the mic bandwidth e.g. 100Hz~8KHz
-const std::vector<float>& pixelise_p(const std::vector<kiss_fft_cpx>& fft, std::vector<float>& power) {
+constexpr uint MIC_BANDWIDTH = 10'000;
 
-  auto BUCKET_SIZE = fft.size() / NPX_PIXELS;
+const std::vector<float>& pixelise_p(const std::vector<kiss_fft_cpx>& fft, size_t cutoff, std::vector<float>& power) {
 
-  float maxp = 2.0e9; // ~3.3V p-p
+  auto BUCKET_SIZE = cutoff / NPX_PIXELS;
+
+  float maxp = 2.0e7; // set by experimentation
   for (size_t i = 0; i < NPX_PIXELS; ++i) {
     // any frequency bin over sample_size/2 is aliased (nyquist sampling theorem)
     auto idx = i * BUCKET_SIZE / 2;
@@ -51,11 +52,16 @@ int main() {
 
   std::vector<float> power(NPX_PIXELS);
 
+  size_t cutoff = SAMPLE_SIZE * (float(MIC_BANDWIDTH) / SAMPLE_FREQ);
+
   for (;;) {
-    pixelise_p(adcfft.sample_raw(), power);
+    // auto t = time_us_64();
+    pixelise_p(adcfft.sample_raw(), cutoff, power);
 
     for (size_t i = 0; i < NPX_PIXELS; ++i) {
       npx.setpixel(palette[i].scaled(power[i]));
     }
+    // t = time_us_64() - t;
+    // printf("dt=%lldus\n", t);
   }
 }

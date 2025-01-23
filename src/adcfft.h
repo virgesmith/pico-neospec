@@ -1,3 +1,5 @@
+#pragma once
+
 #include "kiss_fftr.h"
 
 #include "hardware/adc.h"
