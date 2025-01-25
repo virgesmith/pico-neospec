@@ -14,13 +14,15 @@ Neopixel: I used a 96 RGB LED connected to pin 0.
 
 (Modify `NPX_PIN` and `CAPTURE_CHANNEL` as necessary)
 
-Main loop (sample, FFT, write to Neopixel) timings are approx:
+Main loop (sample, FFT, write to Neopixel) timings (960 samples @ 50kHz) are approx:
 
 Board        | Time (ms)
 -------------|-----
 RP2040       | 40
 RP2350 ARM   | 22
 RP2350 RISCV | 31
+
+At a sampling rate of 50kHz, each sample takes 960x960
 
 ## Build
 

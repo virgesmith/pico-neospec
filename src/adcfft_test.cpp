@@ -5,10 +5,6 @@
 #include <cmath>
 #include <cstdio>
 
-// set clock_div to determine sample rate
-// 0     = 500kHz  (sampling takes 96 cycles)
-// 960   = 50kHz
-// 9600  = 5kHz
 constexpr uint SAMPLE_FREQ = 50'000;
 constexpr uint SAMPLE_SIZE = 960;
 

@@ -6,6 +6,10 @@
 
 namespace {
 
+// set clock_div to determine sample rate
+// 0     = 500kHz  (sampling takes 96 cycles)
+// 960   = 50kHz
+// 9600  = 5kHz
 uint get_clock_div(uint sample_freq) {
   // max sample rate @ 48kHz clock is 500kHz
   return (sample_freq >= 500'000) ? 0 : (48'000'000 / sample_freq);
@@ -46,9 +50,9 @@ ADCFFT::ADCFFT(uint8_t adcpin_, uint sample_freq_, uint sample_size_)
   channel_config_set_dreq(&dma_cfg, DREQ_ADC);
 
   // calculate frequencies of each bin
-  float f_res = sample_freq / sample_size;
-  for (int i = 0; i < sample_size; i++) {
-    freqs[i] = f_res * i;
+  float dfreq = sample_freq / sample_size;
+  for (size_t i = 0; i < sample_size; i++) {
+    freqs[i] = dfreq * i;
   }
 }
 
