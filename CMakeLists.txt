@@ -31,8 +31,8 @@ project(adc_fft_project)
 pico_sdk_init()
 
 add_library(adcfft
-  src/kiss_fft.c
-  src/kiss_fftr.c
+  src/kiss_fft/kiss_fft.c
+  src/kiss_fft/kiss_fftr.c
   src/adcfft.cpp
 )
 target_link_libraries(adcfft

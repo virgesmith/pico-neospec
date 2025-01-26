@@ -1,12 +1,10 @@
 #include "neopixel.h"
 
-//#include "hardware/clocks.h"
-//#include "hardware/pio.h"
 #include "pico/stdlib.h"
-#include "ws2812.pio.h"
 
 #include <array>
 #include <utility>
+#include <functional>
 
 #include <cstdio>
 #include <cstdlib>
@@ -57,9 +55,7 @@ void pattern_greys(NeoPixel& npx, uint t) {
   }
 }
 
-typedef void (*pattern)(NeoPixel&, uint t);
-
-std::pair<pattern, const char*> pattern_table[] = {
+std::pair<std::function<void(NeoPixel&, uint t)>, const char*> pattern_table[] = {
     {pattern_snakes, "Snakes!"},
     {pattern_random, "Random data"},
     {pattern_sparkle, "Sparkles"},

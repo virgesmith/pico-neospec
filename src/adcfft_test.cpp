@@ -10,7 +10,7 @@ constexpr uint SAMPLE_SIZE = 960;
 
 // Channel 0 is GPIO26
 constexpr uint8_t CAPTURE_CHANNEL = 1;
-constexpr uint8_t LED_PIN = 14;
+constexpr uint8_t LED_PIN = 18; // 25 is the (non-W) onboard LED
 
 int main() {
   stdio_init_all();
@@ -32,7 +32,7 @@ int main() {
     gpio_put(LED_PIN, 0);
 
     // compute power and calculate max freq component
-    float max_power = 0;
+    float max_power = 0.0;
     int max_idx = 0;
     // any frequency bin over sample_size/2 is aliased (nyquist sampling theorem)
     for (int i = 0; i < adcfft.sample_size / 2; i++) {
@@ -44,7 +44,7 @@ int main() {
     }
 
     auto tnew = time_us_64();
-    printf("fpeak=%.1fHz dt=%lldus\n", freqs[max_idx], tnew - t - delay_us);
+    printf("fpeak=%.1fHz dt=%lldus\n", freqs[max_idx], (tnew - t) - delay_us);
     t = tnew;
     sleep_us(delay_us);
   }

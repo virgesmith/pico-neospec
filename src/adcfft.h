@@ -1,6 +1,6 @@
 #pragma once
 
-#include "kiss_fftr.h"
+#include "kiss_fft/kiss_fftr.h"
 
 #include "hardware/adc.h"
 #include "hardware/dma.h"
@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <vector>
 
-class ADCFFT {
+class ADCFFT final {
 public:
   // sample size should not exceed 9000 (RP2040 memory constraints)
   ADCFFT(uint8_t adcpin, uint sample_freq, uint sample_size);

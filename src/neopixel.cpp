@@ -1,6 +1,6 @@
 #include "neopixel.h"
 
-#include "ws2812.pio.h"
+#include "ws2812/ws2812.pio.h"
 
 #include <array>
 #include <utility>
