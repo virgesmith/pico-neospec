@@ -22,7 +22,7 @@ RP2040       | 40
 RP2350 ARM   | 22
 RP2350 RISCV | 31
 
-At a sampling rate of 50kHz, each sample takes 960x960
+NB Sampling 960 times at 50kHz takes 921600 cycles or 19.2 ms @ 48MHz.
 
 ## Build
 

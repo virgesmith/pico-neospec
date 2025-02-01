@@ -6,11 +6,10 @@
 #include <cstdio>
 
 constexpr uint SAMPLE_FREQ = 50'000;
-constexpr uint SAMPLE_SIZE = 960;
 
 // Channel 0 is GPIO26
 constexpr uint8_t CAPTURE_CHANNEL = 1;
-constexpr uint8_t LED_PIN = 18; // 25 is the (non-W) onboard LED
+constexpr uint8_t LED_PIN = 25; // is the (non-W) onboard LED
 
 int main() {
   stdio_init_all();
@@ -18,9 +17,9 @@ int main() {
   gpio_init(LED_PIN);
   gpio_set_dir(LED_PIN, GPIO_OUT);
 
-  ADCFFT adcfft(CAPTURE_CHANNEL, SAMPLE_FREQ, SAMPLE_SIZE);
+  ADCFFT adcfft(CAPTURE_CHANNEL, SAMPLE_FREQ);
 
-  auto freqs = adcfft.frequency_bins();
+  const auto& freqs = adcfft.frequency_bins();
 
   auto t = time_us_64();
   auto delay_us = 1000000ull;
@@ -28,14 +27,14 @@ int main() {
   for (;;) {
     gpio_put(LED_PIN, 1);
     // get SAMPLE_SIZE samples at SAMPLE_FREQ
-    auto fft_out = adcfft.sample_raw();
+    const auto& fft_out = adcfft.sample_raw();
     gpio_put(LED_PIN, 0);
 
     // compute power and calculate max freq component
     float max_power = 0.0;
     int max_idx = 0;
     // any frequency bin over sample_size/2 is aliased (nyquist sampling theorem)
-    for (int i = 0; i < adcfft.sample_size / 2; i++) {
+    for (int i = 0; i < ADCFFT::SAMPLE_SIZE / 2; i++) {
       float power = fft_out[i].r * fft_out[i].r + fft_out[i].i * fft_out[i].i;
       if (power > max_power) {
         max_power = power;

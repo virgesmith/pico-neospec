@@ -17,15 +17,14 @@ uint get_clock_div(uint sample_freq) {
 
 } // namespace
 
-ADCFFT::ADCFFT(uint8_t adcpin_, uint sample_freq_, uint sample_size_)
-    : adcpin(adcpin_), sample_freq(sample_freq_), clock_div(get_clock_div(sample_freq_)), sample_size(sample_size_),
-      freqs(sample_size), capture_buffer(sample_size), signal(sample_size), fft(sample_size) {
-  fft_cfg = kiss_fftr_alloc(sample_size, false, 0, 0);
+ADCFFT::ADCFFT(uint8_t adc_channel, uint sample_freq)
+    : adc_channel(adc_channel), sample_freq(sample_freq), clock_div(get_clock_div(sample_freq)) {
+  fft_cfg = kiss_fftr_alloc(SAMPLE_SIZE, false, 0, 0);
 
-  adc_gpio_init(26 + adcpin);
+  adc_gpio_init(26 + adc_channel);
 
   adc_init();
-  adc_select_input(adcpin);
+  adc_select_input(adc_channel);
   adc_fifo_setup(true,  // Write each completed conversion to the sample FIFO
                  true,  // Enable DMA data request (DREQ)
                  1,     // DREQ (and IRQ) asserted when at least 1 sample present
@@ -50,22 +49,22 @@ ADCFFT::ADCFFT(uint8_t adcpin_, uint sample_freq_, uint sample_size_)
   channel_config_set_dreq(&dma_cfg, DREQ_ADC);
 
   // calculate frequencies of each bin
-  float dfreq = sample_freq / sample_size;
-  for (size_t i = 0; i < sample_size; i++) {
+  float dfreq = sample_freq / SAMPLE_SIZE;
+  for (size_t i = 0; i < SAMPLE_SIZE; i++) {
     freqs[i] = dfreq * i;
   }
 }
 
 ADCFFT::~ADCFFT() { kiss_fft_free(fft_cfg); }
 
-const std::vector<kiss_fft_cpx>& ADCFFT::sample_raw() {
+const ADCFFT::array<kiss_fft_cpx>& ADCFFT::sample_raw() {
   adc_fifo_drain();
   adc_run(false);
 
   dma_channel_configure(dma_chan, &dma_cfg,
                         capture_buffer.data(), // dst
                         &adc_hw->fifo,         // src
-                        sample_size,           // transfer count
+                        SAMPLE_SIZE,           // transfer count
                         true                   // start immediately
   );
 

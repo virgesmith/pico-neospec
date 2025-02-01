@@ -48,7 +48,6 @@ target_link_libraries(npx hardware_pio)
 
 add_executable(npx_test
   src/npx_test.cpp
-  src/neopixel.cpp
 )
 pico_enable_stdio_usb(npx_test 1)
 pico_enable_stdio_uart(npx_test 0)
