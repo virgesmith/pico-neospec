@@ -24,7 +24,7 @@ const auto WHITE = RGBW(255, 255, 255);
 template<size_t N>
 void set_palette_red_to_green(std::array<RGBW, N>& palette) {
   const int mult = 255 / N;
-  for (int i = 0; i < N; ++i) {
+  for (size_t i = 0; i < N; ++i) {
     palette[i].rgbw[R] = mult * (N - i);
     palette[i].rgbw[G] = mult * i;
   }
@@ -32,17 +32,17 @@ void set_palette_red_to_green(std::array<RGBW, N>& palette) {
 
 template<size_t N>
 void set_palette_spectrum(std::array<RGBW, N>& palette) {
-  const int mult = 255 / N;
+  const int mult = 255 / (N / 2);
 
-  for (int i = 0; i < N / 2; ++i) {
-    palette[i].rgbw[R] = 4 * (N / 2 - i);
-    palette[i].rgbw[G] = 4 * i;
+  for (size_t i = 0; i < N / 2; ++i) {
+    palette[i].rgbw[R] = mult * (N / 2 - i);
+    palette[i].rgbw[G] = mult * i;
     palette[i].rgbw[B] = 0;
   }
-  for (int i = 0; i < N / 2; ++i) {
+  for (size_t i = 0; i < N / 2; ++i) {
     palette[i + N / 2].rgbw[R] = 0;
-    palette[i + N / 2].rgbw[G] = 4 * (N / 2 - i);
-    palette[i + N / 2].rgbw[B] = 4 * i;
+    palette[i + N / 2].rgbw[G] = mult * (N / 2 - i);
+    palette[i + N / 2].rgbw[B] = mult * i;
   }
 }
 

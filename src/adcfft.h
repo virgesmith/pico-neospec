@@ -35,8 +35,9 @@ public:
 
 private:
   dma_channel_config dma_cfg;
-  uint dma_chan;
+  uint dma_channel;
   array<float> freqs;
+  array<float> window;
 
   array<uint8_t> capture_buffer;
   array<kiss_fft_scalar> signal; // kiss_fft_scalar is a float

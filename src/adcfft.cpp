@@ -2,6 +2,8 @@
 #include "pico/stdlib.h"
 
 #include <algorithm>
+#include <cmath>
+#include <numbers>
 #include <numeric>
 
 namespace {
@@ -18,7 +20,7 @@ uint get_clock_div(uint sample_freq) {
 } // namespace
 
 ADCFFT::ADCFFT(uint8_t adc_channel, uint sample_freq)
-    : adc_channel(adc_channel), sample_freq(sample_freq), clock_div(get_clock_div(sample_freq)) {
+    : clock_div(get_clock_div(sample_freq)), sample_freq(sample_freq), adc_channel(adc_channel) {
   fft_cfg = kiss_fftr_alloc(SAMPLE_SIZE, false, 0, 0);
 
   adc_gpio_init(26 + adc_channel);
@@ -37,8 +39,8 @@ ADCFFT::ADCFFT(uint8_t adc_channel, uint sample_freq)
 
   sleep_ms(1000);
   // Set up the DMA to start transferring data as soon as it appears in FIFO
-  dma_chan = dma_claim_unused_channel(true);
-  dma_cfg = dma_channel_get_default_config(dma_chan);
+  dma_channel = dma_claim_unused_channel(true);
+  dma_cfg = dma_channel_get_default_config(dma_channel);
 
   // Reading from constant address, writing to incrementing byte addresses
   channel_config_set_transfer_data_size(&dma_cfg, DMA_SIZE_8);
@@ -49,9 +51,14 @@ ADCFFT::ADCFFT(uint8_t adc_channel, uint sample_freq)
   channel_config_set_dreq(&dma_cfg, DREQ_ADC);
 
   // calculate frequencies of each bin
-  float dfreq = sample_freq / SAMPLE_SIZE;
+  float dfreq = float(sample_freq) / SAMPLE_SIZE;
   for (size_t i = 0; i < SAMPLE_SIZE; i++) {
     freqs[i] = dfreq * i;
+  }
+
+  // Hann window: reduces spectral leakage smearing tones across bins
+  for (size_t i = 0; i < SAMPLE_SIZE; i++) {
+    window[i] = 0.5f * (1.0f - std::cos(2.0f * std::numbers::pi_v<float> * i / (SAMPLE_SIZE - 1)));
   }
 }
 
@@ -61,7 +68,7 @@ const ADCFFT::array<kiss_fft_cpx>& ADCFFT::sample_raw() {
   adc_fifo_drain();
   adc_run(false);
 
-  dma_channel_configure(dma_chan, &dma_cfg,
+  dma_channel_configure(dma_channel, &dma_cfg,
                         capture_buffer.data(), // dst
                         &adc_hw->fifo,         // src
                         SAMPLE_SIZE,           // transfer count
@@ -69,12 +76,13 @@ const ADCFFT::array<kiss_fft_cpx>& ADCFFT::sample_raw() {
   );
 
   adc_run(true);
-  dma_channel_wait_for_finish_blocking(dma_chan);
+  dma_channel_wait_for_finish_blocking(dma_channel);
 
-  // fill fourier transform input while subtracting DC component
+  // fill fourier transform input, subtracting DC component and applying window
   float avg = float(std::accumulate(capture_buffer.begin(), capture_buffer.end(), 0)) / capture_buffer.size();
-  std::transform(capture_buffer.begin(), capture_buffer.end(), signal.begin(),
-                 [avg](uint8_t n) { return float(n) - avg; });
+  for (size_t i = 0; i < SAMPLE_SIZE; i++) {
+    signal[i] = (float(capture_buffer[i]) - avg) * window[i];
+  }
 
   // compute fast fourier transform
   kiss_fftr(fft_cfg, signal.data(), fft.data());

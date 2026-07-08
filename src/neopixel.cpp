@@ -2,6 +2,7 @@
 
 #include "ws2812/ws2812.pio.h"
 
+#include <algorithm>
 #include <array>
 #include <utility>
 
@@ -9,7 +10,8 @@
 #include <cstdlib>
 
 RGBW RGBW::scaled(float scale) {
-  return RGBW(rgbw[R] * scale, rgbw[G] * scale, rgbw[B] * scale, rgbw[W] * scale);
+  auto s = [scale](uint8_t c) { return uint8_t(std::clamp(c * scale, 0.0f, 255.0f)); };
+  return RGBW(s(rgbw[R]), s(rgbw[G]), s(rgbw[B]), s(rgbw[W]));
 }
 
 NeoPixel::NeoPixel(int pin, int num_pixels) : pin(pin), num_pixels(num_pixels), _idx(0) {
@@ -26,7 +28,7 @@ NeoPixel::NeoPixel(int pin, int num_pixels) : pin(pin), num_pixels(num_pixels), 
 
 int NeoPixel::setpixel(uint32_t pixel_grb) {
   pio_sm_put_blocking(pio, sm, pixel_grb);
-  _idx = (++_idx) % num_pixels;
+  _idx = (_idx + 1) % num_pixels;
   return _idx;
 }
 
