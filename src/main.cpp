@@ -17,15 +17,19 @@ constexpr uint8_t CAPTURE_CHANNEL = 1;
 
 // displayed band, log-spaced across the strip (mic bw is 100-8kHz)
 constexpr float FREQ_MIN = 60.0f;
-constexpr float FREQ_MAX = 5'000.0f;
+constexpr float FREQ_MAX = 8'000.0f;
 
-// brightness spans this much power below the adaptive peak
+// bucket power giving full brightness - the main sensitivity control:
+// raise if quiet music saturates the strip, lower if it barely registers.
+// Louder buckets push the reference up (AGC) so the display never clips.
+constexpr float REF_POWER = 2.0e7f;
+// brightness spans this much power below the reference
 constexpr float DYNAMIC_RANGE_DB = 30.0f;
-constexpr float AGC_DECAY = 0.995f; // peak reference decay per frame
-// silence threshold: raise if the strip flickers in a quiet room,
-// lower if quiet music barely registers
-constexpr float AGC_FLOOR = 2.0e6f;
+constexpr float AGC_DECAY = 0.995f;  // reference decay per frame back toward REF_POWER
 constexpr float PIXEL_DECAY = 0.75f; // lit pixels fade 25% per frame
+
+constexpr float MASTER_BRIGHTNESS = 0.5f; // overall LED intensity
+constexpr float GAMMA = 2.2f;             // perceptual correction: higher = more contrast
 
 // fractional fft bin index of each pixel boundary, log-spaced in frequency
 std::array<float, NPX_PIXELS + 1> bucket_edges() {
@@ -67,7 +71,7 @@ int main() {
   std::array<float, NPX_PIXELS> power;
   std::array<float, NPX_PIXELS> level{};
 
-  float peak = AGC_FLOOR;
+  float peak = REF_POWER;
 
   for (;;) {
     const auto& fft = adcfft.sample_raw();
@@ -78,15 +82,15 @@ int main() {
       frame_max = std::max(frame_max, power[i]);
     }
 
-    // gain reference tracks the loudest bucket, decaying slowly toward the floor
-    peak = std::max({frame_max, peak * AGC_DECAY, AGC_FLOOR});
+    // gain reference tracks the loudest bucket, decaying slowly toward REF_POWER
+    peak = std::max({frame_max, peak * AGC_DECAY, REF_POWER});
 
     for (size_t i = 0; i < NPX_PIXELS; ++i) {
       float db = 10.0f * std::log10(power[i] / peak + 1e-12f);
       float b = std::clamp(1.0f + db / DYNAMIC_RANGE_DB, 0.0f, 1.0f);
       // fast attack, slow decay
       level[i] = std::max(b, level[i] * PIXEL_DECAY);
-      npx.setpixel(palette[i].scaled(level[i]));
+      npx.setpixel(palette[i].scaled(MASTER_BRIGHTNESS * std::pow(level[i], GAMMA)));
     }
   }
 }
