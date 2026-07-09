@@ -54,10 +54,12 @@ A host-side simulation of the exact pipeline (using the repo's kiss_fft on synth
 
 ## Build
 
+Available targets are: rp2040, rp2350-arm-s, rp2350-riscv
+
 ```sh
-mkdir -p build
-cd build
-cmake -DPICO_PLATFORM=rp2040 ..
+mkdir build_pico2_arm
+cd build_pico2_arm
+cmake -DPICO_PLATFORM=rp2350-arm-s ..
 make -j
 ```
 

@@ -1,4 +1,4 @@
 pico_sdk_import.cmake
-build/
+build*/
 .vscode/
 .claude/

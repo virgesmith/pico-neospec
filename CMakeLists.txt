@@ -7,16 +7,21 @@ set(CMAKE_CXX_STANDARD 20)
 set(PICO_SDK_PATH ../../pico-sdk)
 
 if (${PICO_PLATFORM} STREQUAL "rp2040")
-  set(PICO_BOARD pico_w CACHE STRING "Board type")
-  set(PICO_TOOLCHAIN_PATH /usr)
+  set(PICO_BOARD pico CACHE STRING "Board type")
+  set(DEFAULT_TOOLCHAIN_PATH /usr)
 elseif (${PICO_PLATFORM} STREQUAL "rp2350-arm-s")
-  set(PICO_BOARD pico2_w CACHE STRING "Board type")
-  set(PICO_TOOLCHAIN_PATH /usr)
+  set(PICO_BOARD pico2 CACHE STRING "Board type")
+  set(DEFAULT_TOOLCHAIN_PATH /usr)
 elseif (${PICO_PLATFORM} STREQUAL "rp2350-riscv")
-  set(PICO_BOARD pico2_w CACHE STRING "Board type")
-  set(PICO_TOOLCHAIN_PATH /opt/riscv-gcc-14)
+  set(PICO_BOARD pico2 CACHE STRING "Board type")
+  set(DEFAULT_TOOLCHAIN_PATH /opt/riscv-gcc-15)
 else()
   message(FATAL_ERROR "Specify PICO_PLATFORM: either rp2040, rp2350-arm-s or rp2350-riscv")
+endif()
+
+# hardcoded defaults above can be overridden with -DPICO_TOOLCHAIN_PATH=...
+if (NOT DEFINED PICO_TOOLCHAIN_PATH)
+  set(PICO_TOOLCHAIN_PATH ${DEFAULT_TOOLCHAIN_PATH})
 endif()
 
 # ensure we have the correct pico_sdk_import.cmake
