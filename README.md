@@ -2,9 +2,9 @@
 
 Microphone -> Pico ADC -> FFT -> Power spectrum -> Neopixel
 
-FFT based on code here: https://github.com/AlexFWulff/awulff-pico-playground
+FFT based on code [here](https://github.com/AlexFWulff/awulff-pico-playground).
 
-Nexopixel based on code here: https://github.com/raspberrypi/pico-examples/tree/master/pio/ws2812
+Neopixel based on code [here](https://github.com/raspberrypi/pico-examples/tree/master/pio/ws2812).
 
 ## Prerequisites
 
@@ -26,13 +26,14 @@ NB Sampling 960 times at 50kHz takes 921600 cycles or 19.2 ms @ 48MHz.
 
 ## Signal path
 
-Each frame: sample -> window -> FFT -> log-frequency buckets -> dB brightness -> Neopixel.
+Each frame: sample -> window -> FFT -> frequency buckets -> tilt weight -> dB brightness -> Neopixel.
 
 1. **Sample**: 960 8-bit samples at 50kHz via DMA (19.2ms). The DC component (mean) is subtracted.
 2. **Window**: a Hann window is applied before the FFT to reduce spectral leakage, which would otherwise smear strong (especially bass) tones across neighbouring bins.
 3. **FFT**: 960-point real FFT (kiss_fft), giving 481 usable bins of width 50000/960 ≈ 52.1Hz.
-4. **Buckets**: the 96 pixels are log-spaced in frequency from 60Hz to 8kHz, i.e. each pixel spans a constant frequency *ratio* (8000/60)^(1/96) ≈ 1.052, about 0.9 semitones — a piano-key axis rather than a linear one, since musical energy is concentrated in the low octaves. Bucket edges are fractional FFT bin indices and power (|X|²) is integrated over each bucket with proportional contributions from the partial bins at the edges: at the red end a pixel is narrower than one bin, at the blue end it spans ~8 bins. Summing (not averaging) over the wider high-frequency buckets adds a +3dB/octave tilt that roughly offsets the pink (−3dB/octave) spectrum of typical music.
-5. **Brightness**: each bucket's power is expressed in dB relative to a reference. The reference sits at `REF_POWER` (which therefore sets the absolute sensitivity: quiet music renders dim, silence dark) but is pushed up by louder buckets and decays back at 0.5% per frame — downward-only AGC, so the display never clips. The 30dB (`DYNAMIC_RANGE_DB`) below the reference maps linearly to a level 0..1; pixels have fast attack and slow decay (`PIXEL_DECAY`) for the classic analyser trail. Finally the level is gamma-corrected (`GAMMA`) and scaled by `MASTER_BRIGHTNESS` before being written to the strip.
+4. **Buckets**: the 96 pixels span 60Hz to 8kHz, with pixel frequencies blended between a linear and a log mapping via `BLEND` (0 = linear, 1 = log). A pure log axis is a piano-key layout, but at this bin width (~52Hz) it collapses many low pixels onto the same bin, giving blocky bass; linear spreads them out but crams the low octaves. The default `BLEND` = 0.4 is a compromise. Bucket edges are fractional FFT bin indices and power (|X|²) is integrated over each bucket with proportional contributions from the partial bins at the edges.
+5. **Tilt weight**: each bucket's power is multiplied by `(f/FREQ_MIN)^TILT`, using the bucket centre frequency, to offset the bass-heavy energy of typical music that linear-ish spacing would otherwise let dominate. The exponent maps to a slope of ~`3*TILT` dB/octave: `TILT` = 1 is a full pink-noise correction (+3dB/oct), which over the 60Hz–8kHz range (≈7 octaves) is a ~133x power boost at the top — usually too much, making the high end oversensitive. `TILT` = 0.5 (the default, ~+1.5dB/oct, ~12x at 8kHz) is a gentler tilt; 0 disables it entirely and leaves the raw spectrum.
+6. **Brightness**: each bucket's power is expressed in dB relative to a reference. The reference sits at `REF_POWER` (which therefore sets the absolute sensitivity: quiet music renders dim, silence dark) but is pushed up by louder buckets and decays back at 0.5% per frame — downward-only AGC, so the display never clips. The 30dB (`DYNAMIC_RANGE_DB`) below the reference maps linearly to a level 0..1; pixels have fast attack and slow decay (`PIXEL_DECAY`) for the classic analyser trail. Finally the level is gamma-corrected (`GAMMA`) and scaled by `MASTER_BRIGHTNESS` before being written to the strip.
 
 ## Tuning
 
@@ -47,8 +48,10 @@ Symptom-first:
 * *Quiet harmonics invisible* → raise `DYNAMIC_RANGE_DB` (each bucket's brightness reflects how far it is below the reference, so a bigger range keeps weaker content visible) or lower `GAMMA` (1.0 = none).
 * *Display pumps up and down with volume* → the AGC recovery; raise `AGC_DECAY` towards 1 for slower, steadier gain (0.995 ≈ halves in ~7s at 20fps).
 * *Trails too short/jumpy or too smeared* → `PIXEL_DECAY` is the per-frame fade (0.75 ≈ 0.4s to dark); higher = longer trails.
-* *Bass notes appear as wide blocks* → increase `ADCFFT::SAMPLE_SIZE` (in `src/adcfft.h`, e.g. 2400 for ~21Hz bins). Costs frame rate: the FFT is software float on RP2040.
-* *Wrong band of interest* → `FREQ_MIN`/`FREQ_MAX` set the log axis ends. Keep `FREQ_MAX` ≤ mic bandwidth and ≤ `SAMPLE_FREQ/2`; lowering `FREQ_MIN` below the FFT bin width (~52Hz) just stretches the lowest bin over more pixels.
+* *Bass notes appear as wide blocks* → lower `BLEND` towards 0 (more linear spacing spreads the low bins over fewer pixels each). Alternatively increase `ADCFFT::SAMPLE_SIZE` (in `src/adcfft.h`, e.g. 2400 for ~21Hz bins) for finer bins — but that costs frame rate, as the FFT is software float on RP2040.
+* *Bass swamps the display / treble too dim* → raise `TILT` for more high-frequency boost; lower it (towards 0 = flat) if the top end is now overpowering.
+* *Low octaves feel too cramped* → raise `BLEND` towards 1 (more log spacing gives the bass more pixels), at the cost of some blockiness.
+* *Wrong band of interest* → `FREQ_MIN`/`FREQ_MAX` set the axis ends. Keep `FREQ_MAX` ≤ mic bandwidth and ≤ `SAMPLE_FREQ/2`; lowering `FREQ_MIN` below the FFT bin width (~52Hz) just stretches the lowest bin over more pixels.
 
 A host-side simulation of the exact pipeline (using the repo's kiss_fft on synthetic tones) is a quick way to preview parameter changes without flashing.
 
@@ -72,4 +75,3 @@ Copy the uf2 file to device, powered with reset button pressed.
 ```sh
 minicom -b 115200 -D /dev/ttyACM0
 ```
-

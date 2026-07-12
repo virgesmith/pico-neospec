@@ -15,14 +15,33 @@ constexpr uint NPX_PIXELS = 96;
 constexpr uint SAMPLE_FREQ = 50'000;
 constexpr uint8_t CAPTURE_CHANNEL = 1;
 
-// displayed band, log-spaced across the strip (mic bw is 100-8kHz)
+// displayed band (mic bw is 100-8kHz). pixel frequencies blend between a
+// linear and a log mapping via BLEND: 0 = fully linear, 1 = fully log.
+// pure log gives blocky bass at this bin width (~52Hz/bin) as many pixels
+// collapse onto the same low-freq bin; linear spreads them out. a partial
+// blend keeps some bass resolution without the blockiness.
 constexpr float FREQ_MIN = 60.0f;
 constexpr float FREQ_MAX = 8'000.0f;
+constexpr float BLEND = 0.4f;
+
+// spectral tilt to counter music's bass-heavy energy under (mostly) linear
+// spacing: power is weighted by (f/FREQ_MIN)^TILT, boosting higher bands.
+// the slope is ~3*TILT dB/octave, so TILT=1 is a full pink (+3dB/oct)
+// correction -- a ~133x boost from 60Hz to 8kHz. lower if the top end is
+// too sensitive; 0 disables the tilt entirely.
+constexpr float TILT = 0.5f;
+
+// blended pixel frequency for fractional position x in [0, 1]
+float pixel_freq(float x) {
+  const float lin = FREQ_MIN + (FREQ_MAX - FREQ_MIN) * x;
+  const float log = FREQ_MIN * std::pow(FREQ_MAX / FREQ_MIN, x);
+  return (1.0f - BLEND) * lin + BLEND * log;
+}
 
 // bucket power giving full brightness - the main sensitivity control:
 // raise if quiet music saturates the strip, lower if it barely registers.
 // Louder buckets push the reference up (AGC) so the display never clips.
-constexpr float REF_POWER = 2.0e7f;
+constexpr float REF_POWER = 1.0e7f;
 // brightness spans this much power below the reference
 constexpr float DYNAMIC_RANGE_DB = 30.0f;
 constexpr float AGC_DECAY = 0.995f;  // reference decay per frame back toward REF_POWER
@@ -31,14 +50,24 @@ constexpr float PIXEL_DECAY = 0.75f; // lit pixels fade 25% per frame
 constexpr float MASTER_BRIGHTNESS = 0.5f; // overall LED intensity
 constexpr float GAMMA = 2.2f;             // perceptual correction: higher = more contrast
 
-// fractional fft bin index of each pixel boundary, log-spaced in frequency
+// fractional fft bin index of each pixel boundary, blended lin/log in frequency
 std::array<float, NPX_PIXELS + 1> bucket_edges() {
   std::array<float, NPX_PIXELS + 1> edges;
   const float bin_width = float(SAMPLE_FREQ) / ADCFFT::SAMPLE_SIZE;
   for (size_t i = 0; i <= NPX_PIXELS; ++i) {
-    edges[i] = FREQ_MIN * std::pow(FREQ_MAX / FREQ_MIN, float(i) / NPX_PIXELS) / bin_width;
+    edges[i] = pixel_freq(float(i) / NPX_PIXELS) / bin_width;
   }
   return edges;
+}
+
+// per-pixel power weight applying the spectral tilt (see TILT)
+std::array<float, NPX_PIXELS> bucket_weights() {
+  std::array<float, NPX_PIXELS> weights;
+  for (size_t i = 0; i < NPX_PIXELS; ++i) {
+    const float freq = pixel_freq((float(i) + 0.5f) / NPX_PIXELS);
+    weights[i] = std::pow(freq / FREQ_MIN, TILT);
+  }
+  return weights;
 }
 
 // integrate power over the fractional bin range [lo, hi)
@@ -67,6 +96,7 @@ int main() {
   static ADCFFT adcfft(CAPTURE_CHANNEL, SAMPLE_FREQ);
 
   const auto edges = bucket_edges();
+  const auto weights = bucket_weights();
 
   std::array<float, NPX_PIXELS> power;
   std::array<float, NPX_PIXELS> level{};
@@ -78,7 +108,7 @@ int main() {
 
     float frame_max = 0.0f;
     for (size_t i = 0; i < NPX_PIXELS; ++i) {
-      power[i] = band_power(fft, edges[i], edges[i + 1]);
+      power[i] = band_power(fft, edges[i], edges[i + 1]) * weights[i];
       frame_max = std::max(frame_max, power[i]);
     }
 

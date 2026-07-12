@@ -4,7 +4,7 @@
 #include <array>
 #include <cstdint>
 
-enum { W, B, R, G};
+enum { W, B, R, G };
 union RGBW {
   RGBW() : u32(0) {}
   RGBW(uint8_t r, uint8_t g, uint8_t b, uint8_t w = 0) : rgbw{w, b, r, g} {}
@@ -21,8 +21,7 @@ const auto GREEN = RGBW(0, 255, 0);
 const auto BLUE = RGBW(0, 0, 255);
 const auto WHITE = RGBW(255, 255, 255);
 
-template<size_t N>
-void set_palette_red_to_green(std::array<RGBW, N>& palette) {
+template <size_t N> void set_palette_red_to_green(std::array<RGBW, N>& palette) {
   const int mult = 255 / N;
   for (size_t i = 0; i < N; ++i) {
     palette[i].rgbw[R] = mult * (N - i);
@@ -30,8 +29,7 @@ void set_palette_red_to_green(std::array<RGBW, N>& palette) {
   }
 }
 
-template<size_t N>
-void set_palette_spectrum(std::array<RGBW, N>& palette) {
+template <size_t N> void set_palette_spectrum(std::array<RGBW, N>& palette) {
   const int mult = 255 / (N / 2);
 
   for (size_t i = 0; i < N / 2; ++i) {
@@ -45,8 +43,6 @@ void set_palette_spectrum(std::array<RGBW, N>& palette) {
     palette[i + N / 2].rgbw[B] = mult * i;
   }
 }
-
-
 
 class NeoPixel final {
 public:
@@ -66,6 +62,7 @@ public:
 
   const int pin;
   const int num_pixels;
+
 private:
   int _idx;
   PIO pio;
