@@ -5,6 +5,18 @@ referenced below all live at the top of [`src/main.cpp`](src/main.cpp).
 
 ## Unreleased (working tree)
 
+**Adaptive noise gate.**
+
+- The top pixels could light in silence: background noise is roughly flat per
+  FFT bin, and each top bucket sums ~4 bins and is tilt-weighted ~11.5x, so
+  the noise floor sits ~17dB higher there than at the bottom. Each bucket now
+  tracks an adaptive noise floor (a smoothed copy of its power that it follows
+  down quickly but up only slowly via `NOISE_RISE`), and `NOISE_GATE` times
+  that floor is subtracted before the dB mapping. The floor is seeded from a
+  first frame at startup.
+
+## af13a91 — "blend lin/log freq axis, add spectral tilt, document changes"
+
 **Blended frequency axis + spectral tilt.**
 
 - Replaced the pure log-spaced buckets with a **linear/log blend**. Pixel

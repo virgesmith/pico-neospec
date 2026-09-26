@@ -47,6 +47,17 @@ constexpr float DYNAMIC_RANGE_DB = 30.0f;
 constexpr float AGC_DECAY = 0.995f;  // reference decay per frame back toward REF_POWER
 constexpr float PIXEL_DECAY = 0.75f; // lit pixels fade 25% per frame
 
+// adaptive per-bucket noise floor: the floor follows a smoothed copy of each
+// bucket's power down quickly but creeps up only slowly, so it settles on the
+// background (mic hiss, ADC/supply noise) without swallowing notes. NOISE_GATE
+// times the floor is subtracted from each bucket before the dB mapping. the
+// background is roughly flat per fft bin, so without this the wide, tilted
+// top buckets glow even in silence. raise NOISE_GATE if the strip still
+// twinkles in silence; lower it if quiet content is lost.
+constexpr float NOISE_SMOOTH = 0.1f; // smoothing of bucket power fed to the floor (per frame)
+constexpr float NOISE_RISE = 1.001f; // max floor rise per frame (~0.1dB/s at 25fps)
+constexpr float NOISE_GATE = 4.0f;   // floor multiple subtracted (4x = 6dB margin)
+
 constexpr float MASTER_BRIGHTNESS = 0.5f; // overall LED intensity
 constexpr float GAMMA = 2.2f;             // perceptual correction: higher = more contrast
 
@@ -101,14 +112,28 @@ int main() {
   std::array<float, NPX_PIXELS> power;
   std::array<float, NPX_PIXELS> level{};
 
+  auto measure = [&]() {
+    const auto& fft = adcfft.sample_raw();
+    for (size_t i = 0; i < NPX_PIXELS; ++i) {
+      power[i] = band_power(fft, edges[i], edges[i + 1]) * weights[i];
+    }
+  };
+
+  // seed the noise floor from a first frame
+  measure();
+  auto smoothed = power;
+  auto noise = power;
+
   float peak = REF_POWER;
 
   for (;;) {
-    const auto& fft = adcfft.sample_raw();
+    measure();
 
     float frame_max = 0.0f;
     for (size_t i = 0; i < NPX_PIXELS; ++i) {
-      power[i] = band_power(fft, edges[i], edges[i + 1]) * weights[i];
+      smoothed[i] += NOISE_SMOOTH * (power[i] - smoothed[i]);
+      noise[i] = std::min(noise[i] * NOISE_RISE, smoothed[i]);
+      power[i] = std::max(power[i] - NOISE_GATE * noise[i], 0.0f);
       frame_max = std::max(frame_max, power[i]);
     }
 
